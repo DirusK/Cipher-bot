@@ -1,8 +1,12 @@
 storage:
   postgres:
-    connection-string: "host=localhost port=5432 user=postgres dbname=bot password=postgres sslmode=disable"
+    connection-string: "host=localhost port=5432 user=postgres dbname=cipher_bot password=postgres sslmode=disable"
     driver: pgx
     dialect: postgres
     max-retries: 5
     retry-delay: 1s
     query-timeout: 2s
+
+  badger:
+    cipher-key: _KEY_ # hex value
+    key-ttl: 15m

@@ -1,13 +1,35 @@
 settings:
-  token: TOKEN
+  token: _TOKEN_
+  parse_mode: Markdown
 
 buttons:
-  male: 🧑‍🦱 Парень
-  female: 👩‍🦰 Девушка
-  compliment: 💚 Комплимент
+  encrypt: 'Зашифровать 🔒'
+  decrypt: 'Расшифровать 🔓'
+
+  auto:
+    unique: auto
+    text: 'Сгенерированный 📟'
+  manual:
+    unique: manual
+    text: 'Личный 👐'
+
+  algorithm: &algorithm
+    unique: algorithm
+  aes:
+    <<: *algorithm
+    callback_data: AES
+    text: AES
+  rc4:
+    <<: *algorithm
+    callback_data: RC4
+    text: RC4
 
 markups:
-  gender:
-    - [ male, female ]
-  compliments:
-    - [ compliment ]
+  menu:
+    - [ encrypt ]
+    - [ decrypt ]
+  key:
+    - [ auto ]
+    - [ manual ]
+  algorithms:
+    - [ aes, rc4 ]

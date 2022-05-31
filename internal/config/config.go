@@ -21,7 +21,7 @@ type (
 	// Storage defines databases configuration.
 	Storage struct {
 		Postgres database.Config `yaml:"postgres"`
-		Badger   Badger          `yaml:"cipher"`
+		Badger   Badger          `yaml:"badger"`
 	}
 
 	Badger struct {

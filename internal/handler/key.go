@@ -10,7 +10,10 @@ func (h Handler) OnManual(ctx tele.Context) error {
 	err := h.client.Request.
 		Update().
 		SetKeyMode(request.KeyModeManual).
-		Where(request.UserIDEQ(getUserID(ctx))).
+		Where(
+			request.UserIDEQ(getUserID(ctx)),
+			request.StatusEQ(request.StatusActive),
+		).
 		Exec(h.ctx)
 	if err != nil {
 		return err
@@ -25,7 +28,10 @@ func (h Handler) OnAuto(ctx tele.Context) error {
 	err := h.client.Request.
 		Update().
 		SetKeyMode(request.KeyModeAuto).
-		Where(request.UserIDEQ(getUserID(ctx))).
+		Where(
+			request.UserIDEQ(getUserID(ctx)),
+			request.StatusEQ(request.StatusActive),
+		).
 		Exec(h.ctx)
 	if err != nil {
 		return err

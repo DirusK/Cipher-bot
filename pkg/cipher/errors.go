@@ -1,7 +1,16 @@
 package cipher
 
-import "errors"
+const delimiter = " - "
 
 var (
-	ErrInvalidKeyLength = errors.New("invalid key length")
+	errInvalidKeyLength = "invalid key length"
+	errInvalidHexText   = "invalid hex"
 )
+
+type InvalidHexError struct {
+	Message string
+}
+
+func (e InvalidHexError) Error() string {
+	return errInvalidHexText + delimiter + e.Message
+}

@@ -9,13 +9,8 @@ import (
 	"io"
 )
 
-func EncryptAES(plainText, key []byte) (string, error) {
-	byteKey, err := hex.DecodeString(key)
-	if err != nil {
-		return "", err
-	}
-
-	aesCipher, err := aes.NewCipher(byteKey)
+func EncryptAES(plainText string, key []byte) (string, error) {
+	aesCipher, err := aes.NewCipher(key)
 	if err != nil {
 		return "", err
 	}
@@ -36,18 +31,14 @@ func EncryptAES(plainText, key []byte) (string, error) {
 	return hex.EncodeToString(aesGCM.Seal(nonce, nonce, []byte(plainText), nil)), nil
 }
 
-func DecryptAES(cipherText, key string) (string, error) {
-	byteKey, err := hex.DecodeString(key)
-	if err != nil {
-		return "", err
-	}
-
+// DecryptAES decrypts cipherText in HEX format and return plain text.
+func DecryptAES(cipherText string, key []byte) (string, error) {
 	enc, err := hex.DecodeString(cipherText)
 	if err != nil {
-		return "", err
+		return "", InvalidHexError{Message: err.Error()}
 	}
 
-	block, err := aes.NewCipher(byteKey)
+	block, err := aes.NewCipher(key)
 	if err != nil {
 		return "", err
 	}
@@ -71,8 +62,8 @@ func DecryptAES(cipherText, key string) (string, error) {
 	return string(plaintext), nil
 }
 
-func EncryptRC4(plainText, key string) (string, error) {
-	rc4Cipher, err := rc4.NewCipher([]byte(key))
+func EncryptRC4(plainText string, key []byte) (string, error) {
+	rc4Cipher, err := rc4.NewCipher(key)
 	if err != nil {
 		return "", err
 	}
@@ -85,24 +76,33 @@ func EncryptRC4(plainText, key string) (string, error) {
 	return hex.EncodeToString(dst), nil
 }
 
-func DecryptRC4(cipherText, key string) (string, error) {
-	cipherBytes, err := hex.DecodeString(cipherText)
+func DecryptRC4(cipherText string, key []byte) (string, error) {
+	rc4Cipher, err := rc4.NewCipher(key)
 	if err != nil {
 		return "", err
 	}
 
-	rc4Cipher, err := rc4.NewCipher([]byte(key))
+	enc, err := hex.DecodeString(cipherText)
 	if err != nil {
-		return "", err
+		return "", InvalidHexError{Message: err.Error()}
 	}
 
-	plainText := make([]byte, len(cipherBytes))
-	rc4Cipher.XORKeyStream(plainText, cipherBytes)
+	plainText := make([]byte, len(enc))
+	rc4Cipher.XORKeyStream(plainText, enc)
 
 	return string(plainText), nil
 }
 
-func GenerateKey(length int) (string, error) {
+func GenerateKeyBytes(length int) ([]byte, error) {
+	bytes := make([]byte, length)
+	if _, err := rand.Read(bytes); err != nil {
+		return nil, err
+	}
+
+	return bytes, nil
+}
+
+func GenerateKeyHex(length int) (string, error) {
 	bytes := make([]byte, length)
 	if _, err := rand.Read(bytes); err != nil {
 		return "", err

@@ -2,8 +2,6 @@ package bot
 
 import (
 	tele "gopkg.in/telebot.v3"
-
-	"cipher-bot/ent/request"
 )
 
 func (b *Bot) registerCommands() {
@@ -13,8 +11,8 @@ func (b *Bot) registerCommands() {
 	b.telegram.Handle(tele.OnText, b.handler.OnText)
 
 	// Crypto menu
-	b.telegram.Handle(b.layout.Callback("encrypt"), b.handler.OnCrypt(request.TypeEncryption))
-	b.telegram.Handle(b.layout.Callback("decrypt"), b.handler.OnCrypt(request.TypeDecryption))
+	b.telegram.Handle(b.layout.Callback("encrypt"), b.handler.OnEncrypt)
+	b.telegram.Handle(b.layout.Callback("decrypt"), b.handler.OnDecrypt)
 
 	// Algorithm menu
 	b.telegram.Handle(b.layout.Callback("algorithm"), b.handler.OnAlgorithm)

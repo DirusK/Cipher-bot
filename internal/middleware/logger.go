@@ -10,6 +10,8 @@ import (
 
 var RegexpText = regexp.MustCompile(`[\p{L}|\s]+`)
 
+const KeySensitive = "sensitive"
+
 func Logger(l *zap.SugaredLogger) tele.MiddlewareFunc {
 	return func(next tele.HandlerFunc) tele.HandlerFunc {
 		return func(c tele.Context) error {
@@ -24,7 +26,7 @@ func Logger(l *zap.SugaredLogger) tele.MiddlewareFunc {
 				"username", c.Sender().Username,
 			}
 
-			if c.Message() != nil {
+			if c.Message() != nil && c.Get(KeySensitive) == nil {
 				params = append(params, "message", RegexpText.FindString(c.Message().Text))
 			}
 

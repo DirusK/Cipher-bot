@@ -21,7 +21,7 @@ func (Request) Mixin() []ent.Mixin {
 func (Request) Fields() []ent.Field {
 	return []ent.Field{
 		field.Enum("status").
-			Values("active", "done").
+			Values("active", "done", "expired").
 			Default("active"),
 		field.Enum("type").
 			Values("encryption", "decryption"),

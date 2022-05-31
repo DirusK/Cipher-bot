@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v3"
@@ -10,20 +11,33 @@ import (
 	"cipher-bot/ent"
 	"cipher-bot/ent/predicate"
 	"cipher-bot/ent/request"
+	"cipher-bot/internal/middleware"
 	"cipher-bot/pkg/cipher"
 )
 
 const defaultKeyLength = 32
 
 func (h Handler) OnText(ctx tele.Context) error {
+	ctx.Set(middleware.KeySensitive, true)
+
 	done, err := h.processManualKey(ctx)
-	if err != nil {
-		return checkDone(done, err)
+	switch {
+	case errors.Is(err, ErrInvalidKeyLength):
+		return ctx.Send(h.layout.Text(ctx, "invalid-length-key"))
+	case errors.Is(err, ErrInvalidFormatKey):
+		return ctx.Send(h.layout.Text(ctx, "invalid-hex-key"))
+	case err != nil:
+		return err
+	case done:
+		return ctx.Send(h.layout.Text(ctx, "cipher-text-request"))
 	}
 
 	done, err = h.processCipher(ctx)
-	if err != nil {
-		return checkDone(done, err)
+	switch {
+	case err != nil:
+		return err
+	case done:
+		return nil
 	}
 
 	return ctx.Send(h.layout.Text(ctx, "not-understand"))
@@ -49,12 +63,12 @@ func (h Handler) processManualKey(ctx tele.Context) (bool, error) {
 	key, err := hex.DecodeString(ctx.Message().Text)
 	if err != nil {
 		h.logger.Debugf("user %s: hex decode key: invalid format key", ctx.Sender().Username)
-		return false, ctx.Send(h.layout.Text(ctx, "invalid-hex-key"))
+		return false, ErrInvalidFormatKey
 	}
 
 	if len(key) != 32 {
 		h.logger.Debugf("user %s: invalid length key", ctx.Sender().Username)
-		return false, ctx.Send(h.layout.Text(ctx, "invalid-length-key"))
+		return false, ErrInvalidKeyLength
 	}
 
 	if err = h.cache.Update(func(txn *badger.Txn) error {
@@ -83,7 +97,6 @@ func (h Handler) processCipher(ctx tele.Context) (bool, error) {
 		Where(
 			request.UserIDEQ(getUserID(ctx)),
 			request.StatusEQ(request.StatusActive),
-			request.TypeEQ(request.TypeEncryption),
 		).
 		Only(h.ctx)
 	if err != nil {
@@ -97,12 +110,21 @@ func (h Handler) processCipher(ctx tele.Context) (bool, error) {
 
 	key, err := h.prepareKeyByMode(ctx, *req.KeyMode)
 	if err != nil {
+		if errors.Is(err, ErrKeyExpired) {
+			return true, ctx.Send(h.layout.Text(ctx, "request-expired"))
+		}
+
 		return false, err
 	}
 
+	var (
+		cipherText string
+		plainText  string
+	)
+
 	switch req.Type {
 	case request.TypeEncryption:
-		cipherText, err := h.encrypt(ctx, *req.Algorithm, key)
+		cipherText, err = h.encrypt(ctx, *req.Algorithm, key)
 		if err != nil {
 			return false, err
 		}
@@ -111,7 +133,7 @@ func (h Handler) processCipher(ctx tele.Context) (bool, error) {
 			Key        string
 			CipherText string
 		}{
-			Key:        key,
+			Key:        hex.EncodeToString(key),
 			CipherText: cipherText,
 		}
 
@@ -120,7 +142,7 @@ func (h Handler) processCipher(ctx tele.Context) (bool, error) {
 		}
 
 	case request.TypeDecryption:
-		plainText, err := h.decrypt(ctx, *req.Algorithm, key)
+		plainText, err = h.decrypt(ctx, *req.Algorithm, key)
 		if err != nil {
 			return false, err
 		}
@@ -140,43 +162,51 @@ func (h Handler) processCipher(ctx tele.Context) (bool, error) {
 		Exec(h.ctx)
 }
 
-func (h Handler) prepareKeyByMode(ctx tele.Context, mode request.KeyMode) (string, error) {
-	var key string
+func (h Handler) prepareKeyByMode(ctx tele.Context, mode request.KeyMode) ([]byte, error) {
+	var key []byte
 
 	switch mode {
 	case request.KeyModeAuto:
-		return cipher.GenerateKey(defaultKeyLength)
+		return cipher.GenerateKeyBytes(defaultKeyLength)
+
 	case request.KeyModeManual:
 		err := h.cache.Update(func(txn *badger.Txn) error {
 			cacheKey := getUserIDBytes(ctx)
 
 			item, err := txn.Get(cacheKey)
 			if err != nil {
+				if errors.Is(err, badger.ErrKeyNotFound) {
+					if err = h.setExpiredActiveRequest(ctx); err != nil {
+						return err
+					}
+
+					return ErrKeyExpired
+				}
+
 				return err
 			}
 
-			err = item.Value(func(val []byte) error {
-				key = hex.EncodeToString(val)
+			if err = item.Value(func(val []byte) error {
+				key = append(key, val...)
 				return nil
-			})
-			if err != nil {
+			}); err != nil {
 				return err
 			}
 
 			return txn.Delete(cacheKey)
 		})
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 
 		return key, nil
 
 	default:
-		return "", nil
+		return nil, nil
 	}
 }
 
-func (h Handler) encrypt(ctx tele.Context, algorithm request.Algorithm, key string) (string, error) {
+func (h Handler) encrypt(ctx tele.Context, algorithm request.Algorithm, key []byte) (string, error) {
 	plainText := ctx.Message().Text
 
 	switch algorithm {
@@ -189,15 +219,36 @@ func (h Handler) encrypt(ctx tele.Context, algorithm request.Algorithm, key stri
 	}
 }
 
-func (h Handler) decrypt(ctx tele.Context, algorithm request.Algorithm, key string) (string, error) {
-	cipherText := ctx.Message().Text
+func (h Handler) decrypt(ctx tele.Context, algorithm request.Algorithm, key []byte) (string, error) {
+	handleError := func(err error) error {
+		if errors.As(err, &cipher.InvalidHexError{}) {
+			return ctx.Send(h.layout.Text(ctx, "invalid-hex-text"))
+		}
+
+		return err
+	}
+
+	var (
+		text string
+		err  error
+	)
 
 	switch algorithm {
 	case request.AlgorithmAES:
-		return cipher.DecryptAES(cipherText, key)
+		text, err = cipher.DecryptAES(ctx.Message().Text, key)
+		if err != nil {
+			return "", handleError(err)
+		}
+
 	case request.AlgorithmRC4:
-		return cipher.DecryptRC4(cipherText, key)
+		text, err = cipher.DecryptRC4(ctx.Message().Text, key)
+		if err != nil {
+			return "", handleError(err)
+		}
+
 	default:
 		return "", fmt.Errorf("unsupported decrypt algorithm: %s", algorithm)
 	}
+
+	return text, nil
 }
