@@ -1,0 +1,14 @@
+version: "3.8"
+
+services:
+  racer-bot:
+    image: racer-bot
+    container_name: racer
+    restart: always
+    build: .
+    networks:
+      - docker_local
+
+networks:
+  docker_local:
+    external: true

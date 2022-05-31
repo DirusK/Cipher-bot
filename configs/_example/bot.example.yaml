@@ -1,0 +1,13 @@
+settings:
+  token: TOKEN
+
+buttons:
+  male: 🧑‍🦱 Парень
+  female: 👩‍🦰 Девушка
+  compliment: 💚 Комплимент
+
+markups:
+  gender:
+    - [ male, female ]
+  compliments:
+    - [ compliment ]

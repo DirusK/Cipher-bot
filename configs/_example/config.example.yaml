@@ -1,0 +1,8 @@
+storage:
+  postgres:
+    connection-string: "host=localhost port=5432 user=postgres dbname=bot password=postgres sslmode=disable"
+    driver: pgx
+    dialect: postgres
+    max-retries: 5
+    retry-delay: 1s
+    query-timeout: 2s
