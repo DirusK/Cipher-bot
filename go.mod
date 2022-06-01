@@ -4,6 +4,7 @@ go 1.17
 
 require (
 	entgo.io/ent v0.10.1
+	github.com/dgraph-io/badger/v3 v3.2103.2
 	github.com/fatih/color v1.13.0
 	github.com/jackc/pgx v3.6.2+incompatible
 	github.com/spf13/pflag v1.0.5
@@ -19,7 +20,6 @@ require (
 	github.com/apparentlymart/go-textseg/v13 v13.0.0 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.1 // indirect
-	github.com/dgraph-io/badger/v3 v3.2103.2 // indirect
 	github.com/dgraph-io/ristretto v0.1.0 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/go-gorp/gorp/v3 v3.0.2 // indirect

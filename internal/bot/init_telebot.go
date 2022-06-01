@@ -46,8 +46,8 @@ func (b *Bot) initTelebot() {
 
 	b.telegram.OnError = func(err error, ctx tele.Context) {
 		b.logger.Errorf(
-			"telegram id: %s, command: %s, description: %v",
-			ctx.Sender().Recipient(),
+			"telegram username: %s, command: %s, description: %v",
+			ctx.Sender().Username,
 			middleware.RegexpText.FindString(ctx.Message().Text),
 			err,
 		)

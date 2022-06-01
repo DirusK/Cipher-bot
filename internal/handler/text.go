@@ -20,7 +20,7 @@ const defaultKeyLength = 32
 func (h Handler) OnText(ctx tele.Context) error {
 	ctx.Set(middleware.KeySensitive, true)
 
-	done, err := h.processManualKey(ctx)
+	stop, err := h.processManualKey(ctx)
 	switch {
 	case errors.Is(err, ErrInvalidKeyLength):
 		return ctx.Send(h.layout.Text(ctx, "invalid-length-key"))
@@ -28,15 +28,15 @@ func (h Handler) OnText(ctx tele.Context) error {
 		return ctx.Send(h.layout.Text(ctx, "invalid-hex-key"))
 	case err != nil:
 		return err
-	case done:
+	case stop:
 		return ctx.Send(h.layout.Text(ctx, "cipher-text-request"))
 	}
 
-	done, err = h.processCipher(ctx)
+	stop, err = h.processCipher(ctx)
 	switch {
 	case err != nil:
 		return err
-	case done:
+	case stop:
 		return nil
 	}
 
@@ -137,17 +137,34 @@ func (h Handler) processCipher(ctx tele.Context) (bool, error) {
 			CipherText: cipherText,
 		}
 
-		if err = ctx.Send(h.layout.Text(ctx, "encrypt-result", result)); err != nil {
+		if err = ctx.Send(
+			h.layout.Text(ctx, "encrypt-result", result),
+			h.layout.Markup(ctx, "menu"),
+			tele.NoPreview,
+			tele.OneTimeKeyboard,
+		); err != nil {
 			return false, err
 		}
 
 	case request.TypeDecryption:
 		plainText, err = h.decrypt(ctx, *req.Algorithm, key)
 		if err != nil {
+			switch err.(type) {
+			case cipher.InvalidHexError:
+				return true, ctx.Send(h.layout.Text(ctx, "invalid-hex-text"))
+			case cipher.DecryptionError:
+				return true, ctx.Send(h.layout.Text(ctx, "invalid-cipher-text"))
+			}
+
 			return false, err
 		}
 
-		if err = ctx.Send(h.layout.Text(ctx, "decrypt-result", plainText)); err != nil {
+		if err = ctx.Send(
+			h.layout.Text(ctx, "decrypt-result", plainText),
+			h.layout.Markup(ctx, "menu"),
+			tele.NoPreview,
+			tele.OneTimeKeyboard,
+		); err != nil {
 			return false, err
 		}
 
@@ -207,48 +224,23 @@ func (h Handler) prepareKeyByMode(ctx tele.Context, mode request.KeyMode) ([]byt
 }
 
 func (h Handler) encrypt(ctx tele.Context, algorithm request.Algorithm, key []byte) (string, error) {
-	plainText := ctx.Message().Text
-
 	switch algorithm {
 	case request.AlgorithmAES:
-		return cipher.EncryptAES(plainText, key)
+		return cipher.EncryptAES(ctx.Message().Text, key)
 	case request.AlgorithmRC4:
-		return cipher.EncryptRC4(plainText, key)
+		return cipher.EncryptRC4(ctx.Message().Text, key)
 	default:
 		return "", fmt.Errorf("unsupported encrypt algorithm: %s", algorithm)
 	}
 }
 
 func (h Handler) decrypt(ctx tele.Context, algorithm request.Algorithm, key []byte) (string, error) {
-	handleError := func(err error) error {
-		if errors.As(err, &cipher.InvalidHexError{}) {
-			return ctx.Send(h.layout.Text(ctx, "invalid-hex-text"))
-		}
-
-		return err
-	}
-
-	var (
-		text string
-		err  error
-	)
-
 	switch algorithm {
 	case request.AlgorithmAES:
-		text, err = cipher.DecryptAES(ctx.Message().Text, key)
-		if err != nil {
-			return "", handleError(err)
-		}
-
+		return cipher.DecryptAES(ctx.Message().Text, key)
 	case request.AlgorithmRC4:
-		text, err = cipher.DecryptRC4(ctx.Message().Text, key)
-		if err != nil {
-			return "", handleError(err)
-		}
-
+		return cipher.DecryptRC4(ctx.Message().Text, key)
 	default:
 		return "", fmt.Errorf("unsupported decrypt algorithm: %s", algorithm)
 	}
-
-	return text, nil
 }

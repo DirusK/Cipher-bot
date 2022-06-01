@@ -50,13 +50,17 @@ func DecryptAES(cipherText string, key []byte) (string, error) {
 
 	nonceSize := aesGCM.NonceSize()
 
+	if len(enc) < nonceSize {
+		return "", DecryptionError{Message: "nonce size cipher text is smaller than nonce size"}
+	}
+
 	// Extract the nonce from the encrypted data
 	nonce, ciphertext := enc[:nonceSize], enc[nonceSize:]
 
 	// Decrypt the data
 	plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
-		return "", err
+		return "", DecryptionError{Message: err.Error()}
 	}
 
 	return string(plaintext), nil

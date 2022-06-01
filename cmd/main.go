@@ -18,11 +18,9 @@ import (
 
 const botName = "CIPHER-BOT"
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
-
 func main() {
+	rand.Seed(time.Now().UnixNano())
+
 	cfgPath := pflag.StringP("config", "c", config.DefaultPath, "configuration file")
 	flag.Parse()
 

@@ -8,6 +8,10 @@ func (b *Bot) registerCommands() {
 	// Main bot commands
 	b.telegram.Handle("/start", b.handler.OnStart)
 	b.telegram.Handle("/help", b.handler.OnHelp)
+	b.telegram.Handle("/generate", b.handler.OnGenerate)
+	b.telegram.Handle("/menu", b.handler.OnMenu)
+
+	// Other functions
 	b.telegram.Handle(tele.OnText, b.handler.OnText)
 
 	// Crypto menu
